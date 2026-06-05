@@ -2,14 +2,11 @@ name: Mise à jour données parlementaires
 
 on:
   schedule:
-    # Tous les jours à 6h30 heure de Paris (5h30 UTC)
-    # Les données AN sont publiées dans la nuit
     - cron: '30 5 * * *'
   workflow_dispatch:
-    # Déclenchement manuel possible depuis l'interface GitHub
     inputs:
       force_full:
-        description: 'Forcer une mise à jour complète (y compris archives)'
+        description: 'Forcer mise à jour complète archives'
         required: false
         default: 'false'
 
@@ -28,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Installer dépendances Python
+      - name: Installer dépendances
         run: pip install requests
 
       - name: Mise à jour élus (AN + Sénat)
@@ -44,14 +41,8 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Mise à jour archives (hebdomadaire)
-        # Les archives changent rarement — on les met à jour le lundi
-        if: github.event.inputs.force_full == 'true' || github.event.schedule == '30 5 * * 1'
+        if: github.event.inputs.force_full == 'true'
         run: python scripts/update_archives.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-
-      - name: Résumé
-        if: always()
-        run: |
-          echo "Mise à jour terminée : $(date '+%Y-%m-%d %H:%M')"
