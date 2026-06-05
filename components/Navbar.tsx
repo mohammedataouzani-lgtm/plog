@@ -4,10 +4,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const NAV = [
-  { href: "/deputes",   label: "Députés" },
+  { href: "/deputes", label: "Députés" },
   { href: "/senateurs", label: "Sénateurs" },
-  { href: "/scrutins",  label: "Scrutins" },
-  { href: "/archives",  label: "Archives" },
+  { href: "/scrutins", label: "Scrutins" },
+  { href: "/archives", label: "Archives" },
+  { href: "/comparer", label: "Comparer" },
 ];
 
 export default function Navbar() {

@@ -1,9 +1,3 @@
-/**
- * lib/db.ts
- * Async SQLite via @libsql/client
- * Local : file:data/parlement.db
- * Production : Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN)
- */
 import { createClient, type Client } from "@libsql/client";
 
 let _db: Client | null = null;
@@ -16,8 +10,6 @@ function getDb(): Client {
   });
   return _db;
 }
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Depute {
   uid: string; chambre: string; legislature: number;
@@ -73,7 +65,14 @@ export interface PaginatedResult<T> {
   data: T[]; total: number; page: number; pageSize: number; totalPages: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+export interface ConvergenceResult {
+  total: number; accord: number; taux: number;
+}
+
+export interface VoteCommun {
+  scrutin_uid: string; date: string | null; titre: string | null;
+  sort: string | null; pos_a: string; pos_b: string;
+}
 
 async function rows<T>(sql: string, args: Record<string, any> | any[] = {}): Promise<T[]> {
   const res = await getDb().execute({ sql, args: args as any });
@@ -90,12 +89,10 @@ async function paginate<T>(
   params: Record<string, any>, page: number, pageSize: number
 ): Promise<PaginatedResult<T>> {
   const countRow = await row<{ total: number }>(countSql, params);
-  const total    = Number(countRow?.total ?? 0);
-  const data     = await rows<T>(dataSql, { ...params, limit: pageSize, offset: (page - 1) * pageSize });
+  const total = Number(countRow?.total ?? 0);
+  const data = await rows<T>(dataSql, { ...params, limit: pageSize, offset: (page - 1) * pageSize });
   return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
-
-// ─── Députés ─────────────────────────────────────────────────────────────────
 
 export async function getDeputes(opts: {
   page?: number; pageSize?: number;
@@ -103,10 +100,10 @@ export async function getDeputes(opts: {
 }): Promise<PaginatedResult<Depute>> {
   const { page = 1, pageSize = 60, groupe, departement, statut, q } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (groupe)      { where.push("groupe_abrev = :groupe");          p.groupe = groupe; }
-  if (departement) { where.push("num_departement = :dept");         p.dept   = departement; }
-  if (statut)      { where.push("statut = :statut");                p.statut = statut; }
-  if (q)           { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q      = `%${q}%`; }
+  if (groupe) { where.push("groupe_abrev = :groupe"); p.groupe = groupe; }
+  if (departement) { where.push("num_departement = :dept"); p.dept = departement; }
+  if (statut) { where.push("statut = :statut"); p.statut = statut; }
+  if (q) { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return paginate<Depute>(
     `SELECT COUNT(*) as total FROM deputes ${w}`,
@@ -119,16 +116,14 @@ export async function getDepute(uid: string): Promise<Depute | null> {
   return row<Depute>("SELECT * FROM deputes WHERE uid = ?", [uid]);
 }
 
-// ─── Sénateurs ────────────────────────────────────────────────────────────────
-
 export async function getSenateurs(opts: {
   page?: number; pageSize?: number; groupe?: string; circonscription?: string; q?: string;
 }): Promise<PaginatedResult<Senateur>> {
   const { page = 1, pageSize = 60, groupe, circonscription, q } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (groupe)         { where.push("groupe = :groupe");                p.groupe = groupe; }
-  if (circonscription){ where.push("circonscription = :circo");        p.circo  = circonscription; }
-  if (q)              { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q      = `%${q}%`; }
+  if (groupe) { where.push("groupe = :groupe"); p.groupe = groupe; }
+  if (circonscription) { where.push("circonscription = :circo"); p.circo = circonscription; }
+  if (q) { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return paginate<Senateur>(
     `SELECT COUNT(*) as total FROM senateurs ${w}`,
@@ -141,19 +136,17 @@ export async function getSenateur(uid: string): Promise<Senateur | null> {
   return row<Senateur>("SELECT * FROM senateurs WHERE uid = ?", [uid]);
 }
 
-// ─── Archives ─────────────────────────────────────────────────────────────────
-
 export async function getArchives(opts: {
   page?: number; pageSize?: number;
   chambre?: string; groupe?: string; departement?: string; legislature?: string; q?: string;
 }): Promise<PaginatedResult<Archive>> {
   const { page = 1, pageSize = 60, chambre, groupe, departement, legislature, q } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (chambre)     { where.push("chambre = :chambre");                p.chambre = chambre; }
-  if (groupe)      { where.push("groupe = :groupe");                  p.groupe  = groupe; }
-  if (departement) { where.push("num_departement = :dept");           p.dept    = departement; }
-  if (legislature) { where.push("derniere_legislature = :leg");       p.leg     = legislature; }
-  if (q)           { where.push("(nom LIKE :q OR prenom LIKE :q)");   p.q       = `%${q}%`; }
+  if (chambre) { where.push("chambre = :chambre"); p.chambre = chambre; }
+  if (groupe) { where.push("groupe = :groupe"); p.groupe = groupe; }
+  if (departement) { where.push("num_departement = :dept"); p.dept = departement; }
+  if (legislature) { where.push("derniere_legislature = :leg"); p.leg = legislature; }
+  if (q) { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return paginate<Archive>(
     `SELECT COUNT(*) as total FROM archives ${w}`,
@@ -166,17 +159,15 @@ export async function getArchive(uid: string, chambre: string): Promise<Archive 
   return row<Archive>("SELECT * FROM archives WHERE uid = ? AND chambre = ?", [uid, chambre]);
 }
 
-// ─── Scrutins ─────────────────────────────────────────────────────────────────
-
 export async function getScrutins(opts: {
   page?: number; pageSize?: number;
   sort?: string; type?: string; q?: string;
 }): Promise<PaginatedResult<Scrutin>> {
   const { page = 1, pageSize = 50, sort, type, q } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (sort) { where.push("sort = :sort");           p.sort = sort; }
+  if (sort) { where.push("sort = :sort"); p.sort = sort; }
   if (type) { where.push("type_vote_code = :type"); p.type = type; }
-  if (q)    { where.push("titre LIKE :q");          p.q    = `%${q}%`; }
+  if (q) { where.push("titre LIKE :q"); p.q = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return paginate<Scrutin>(
     `SELECT COUNT(*) as total FROM scrutins ${w}`,
@@ -200,8 +191,6 @@ export async function getVotesPourScrutin(scrutinUid: string) {
     ORDER BY v.position, d.groupe_abrev, d.nom
   `, [scrutinUid]);
 }
-
-// ─── Votes par acteur ─────────────────────────────────────────────────────────
 
 export async function getVotesActeur(acteurUid: string, opts: {
   page?: number; pageSize?: number; position?: string;
@@ -227,16 +216,14 @@ export async function getStatsVotesActeur(acteurUid: string) {
     [acteurUid]
   );
   const map = Object.fromEntries(r.map(x => [x.position, Number(x.n)]));
-  const pour       = map.pour        ?? 0;
-  const contre     = map.contre      ?? 0;
-  const abstention = map.abstention  ?? 0;
-  const nonVotant  = (map.nonVotant  ?? 0) + (map.nonVotantVolontaire ?? 0);
-  const total      = pour + contre + abstention + nonVotant;
+  const pour = map.pour ?? 0;
+  const contre = map.contre ?? 0;
+  const abstention = map.abstention ?? 0;
+  const nonVotant = (map.nonVotant ?? 0) + (map.nonVotantVolontaire ?? 0);
+  const total = pour + contre + abstention + nonVotant;
   const participation = total > 0 ? Math.round((pour + contre + abstention) / total * 100) : 0;
   return { total, pour, contre, abstention, nonVotant, participation };
 }
-
-// ─── Recherche globale ────────────────────────────────────────────────────────
 
 export async function globalSearch(q: string, limit = 10) {
   const pat = `%${q}%`;
@@ -249,8 +236,6 @@ export async function globalSearch(q: string, limit = 10) {
   return { deputes, senateurs, archives, scrutins };
 }
 
-// ─── Stats ────────────────────────────────────────────────────────────────────
-
 export async function getStats() {
   const [d, s, a, sc, gAN, gSen, recents] = await Promise.all([
     row<{ n: number }>("SELECT COUNT(*) as n FROM deputes WHERE statut='actif'"),
@@ -262,12 +247,40 @@ export async function getStats() {
     rows("SELECT uid,date,titre,sort,pour,contre,abstentions FROM scrutins ORDER BY date DESC LIMIT 5"),
   ]);
   return {
-    totalDeputes:   Number(d?.n ?? 0),
+    totalDeputes: Number(d?.n ?? 0),
     totalSenateurs: Number(s?.n ?? 0),
-    totalArchives:  Number(a?.n ?? 0),
-    totalScrutins:  Number(sc?.n ?? 0),
-    groupesAN:      gAN,
-    groupesSenat:   gSen,
+    totalArchives: Number(a?.n ?? 0),
+    totalScrutins: Number(sc?.n ?? 0),
+    groupesAN: gAN,
+    groupesSenat: gSen,
     recentScrutins: recents,
   };
+}
+
+export async function getConvergence(uid_a: string, uid_b: string): Promise<ConvergenceResult> {
+  const r = await row<{ total: number; accord: number }>(`
+    SELECT COUNT(*) as total,
+      SUM(CASE WHEN v1.position = v2.position THEN 1 ELSE 0 END) as accord
+    FROM votes v1
+    JOIN votes v2 ON v1.scrutin_uid = v2.scrutin_uid
+    WHERE v1.acteur_uid = ? AND v2.acteur_uid = ?
+  `, [uid_a, uid_b]);
+  const total = Number(r?.total ?? 0);
+  const accord = Number(r?.accord ?? 0);
+  return { total, accord, taux: total > 0 ? Math.round(accord / total * 100) : 0 };
+}
+
+export async function getVotesDivergents(uid_a: string, uid_b: string, limit = 50): Promise<VoteCommun[]> {
+  return rows<VoteCommun>(`
+    SELECT v1.scrutin_uid, s.date, s.titre, s.sort,
+           v1.position as pos_a, v2.position as pos_b
+    FROM votes v1
+    JOIN votes v2 ON v1.scrutin_uid = v2.scrutin_uid
+    JOIN scrutins s ON v1.scrutin_uid = s.uid
+    WHERE v1.acteur_uid = ? AND v2.acteur_uid = ?
+      AND v1.position != v2.position
+      AND v1.position NOT IN ('nonVotant','nonVotantVolontaire')
+      AND v2.position NOT IN ('nonVotant','nonVotantVolontaire')
+    ORDER BY s.date DESC LIMIT ?
+  `, [uid_a, uid_b, limit]);
 }
