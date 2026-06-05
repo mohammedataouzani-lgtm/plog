@@ -21,7 +21,12 @@ export interface Depute {
   date_debut_mandat: string | null; date_fin_mandat: string | null;
   statut: "actif" | "mandat_termine"; raison_fin: string | null;
   site_web: string | null; hatvp: string | null;
+  // Stats
+  participation_rate: number | null;
+  rebellion_rate: number | null;
+  votes_total: number | null;
 }
+
 
 export interface Senateur {
   uid: string; chambre: string;
@@ -97,17 +102,29 @@ async function paginate<T>(
 export async function getDeputes(opts: {
   page?: number; pageSize?: number;
   groupe?: string; departement?: string; statut?: string; q?: string;
+  tri?: string;
 }): Promise<PaginatedResult<Depute>> {
-  const { page = 1, pageSize = 60, groupe, departement, statut, q } = opts;
+  const { page = 1, pageSize = 60, groupe, departement, statut, q, tri = "nom" } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (groupe) { where.push("groupe_abrev = :groupe"); p.groupe = groupe; }
-  if (departement) { where.push("num_departement = :dept"); p.dept = departement; }
-  if (statut) { where.push("statut = :statut"); p.statut = statut; }
-  if (q) { where.push("(nom LIKE :q OR prenom LIKE :q)"); p.q = `%${q}%`; }
+  if (groupe)      { where.push("d.groupe_abrev = :groupe");             p.groupe = groupe; }
+  if (departement) { where.push("d.num_departement = :dept");            p.dept   = departement; }
+  if (statut)      { where.push("d.statut = :statut");                   p.statut = statut; }
+  if (q)           { where.push("(d.nom LIKE :q OR d.prenom LIKE :q)");  p.q      = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const ORDER = {
+    "nom":                "d.nom, d.prenom",
+    "participation_asc":  "COALESCE(s.participation_rate, 0) ASC",
+    "participation_desc": "COALESCE(s.participation_rate, 0) DESC",
+    "rebellion_desc":     "COALESCE(s.rebellion_rate, 0) DESC",
+  }[tri] ?? "d.nom, d.prenom";
+
+  const JOIN = "LEFT JOIN stats_deputes s ON d.uid = s.uid";
+  const SELECT = `d.*, s.participation_rate, s.rebellion_rate, s.votes_total`;
+
   return paginate<Depute>(
-    `SELECT COUNT(*) as total FROM deputes ${w}`,
-    `SELECT * FROM deputes ${w} ORDER BY nom, prenom LIMIT :limit OFFSET :offset`,
+    `SELECT COUNT(*) as total FROM deputes d ${w}`,
+    `SELECT ${SELECT} FROM deputes d ${JOIN} ${w} ORDER BY ${ORDER} LIMIT :limit OFFSET :offset`,
     p, page, pageSize
   );
 }
