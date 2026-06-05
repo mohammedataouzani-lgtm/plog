@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:        #F2F0EB;
+  --bg-card:   #FAFAF7;
+  --border:    #D9D5CC;
+  --text:      #111111;
+  --text-muted: #6B6760;
+  --an:        #1A3A8F;
+  --senat:     #B91C1C;
+  --accent:    #1A3A8F;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { font-family: var(--font-body); background: var(--bg); color: var(--text); }
+
+body { min-height: 100vh; }
+
+/* Lignes de registre sur fond */
+.bg-register {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 47px,
+    var(--border) 47px,
+    var(--border) 48px
+  );
+}
+
+/* Élément décoratif — trait tricolore */
+.tricolor-bar {
+  background: linear-gradient(to right, #002395 33.33%, #fff 33.33% 66.66%, #ED2939 66.66%);
+  height: 3px;
+}
+
+/* Transitions */
+a, button { transition: opacity 0.15s, background 0.15s, color 0.15s; }
+
+/* Typography */
+.font-display { font-family: var(--font-display); }

@@ -1,0 +1,5 @@
+.vercel
+data/
+node_modules/
+.next/
+data/
