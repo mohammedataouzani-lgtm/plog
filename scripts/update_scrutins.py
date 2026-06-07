@@ -1,121 +1,83 @@
-"""
-scripts/update_scrutins.py
-Mise à jour INCRÉMENTALE des scrutins AN.
-Télécharge uniquement les scrutins plus récents que le dernier en base.
-"""
-
-import sys
-import os
-import json
-import glob
-import zipfile
-import urllib.request
-import tempfile
+"""scripts/update_scrutins.py — via Turso CLI"""
+import os, sys, json, glob, zipfile, io, subprocess, urllib.request
 from collections import defaultdict
 
-sys.path.insert(0, os.path.dirname(__file__))
-from turso_client import TursoClient
-
 SCRUTINS_URL = "http://data.assemblee-nationale.fr/static/openData/repository/17/loi/scrutins/Scrutins.json.zip"
+POSITION_MAP = {"pours":"pour","contres":"contre","abstentions":"abstention","nonVotants":"nonVotant","nonVotantsVolontaires":"nonVotantVolontaire"}
 
-POSITION_MAP = {
-    "pours":                 "pour",
-    "contres":               "contre",
-    "abstentions":           "abstention",
-    "nonVotants":            "nonVotant",
-    "nonVotantsVolontaires": "nonVotantVolontaire",
-}
+def db_name():
+    return os.environ["TURSO_DATABASE_URL"].replace("libsql://","").split(".")[0]
+
+def turso(sql):
+    r = subprocess.run(["turso","db","shell",db_name(),sql], capture_output=True, text=True)
+    return r.stdout
+
+def turso_file(path):
+    with open(path) as f:
+        lines = [l for l in f.read().split("\n") if l.strip()]
+    for i in range(0, len(lines), 200):
+        bloc = "\n".join(lines[i:i+200])
+        subprocess.run(["turso","db","shell",db_name(),bloc], capture_output=True)
+        if (i//200)%10==0: print(f"  {min(i+200,len(lines))}/{len(lines)}", flush=True)
+
+def esc(v):
+    if v is None: return "NULL"
+    return "'" + str(v).replace("'","''") + "'"
 
 def extract_votants(section):
     if not section: return []
-    v = section.get("votant", [])
-    return [v] if isinstance(v, dict) else (v or [])
-
-def parse_scrutin(raw):
-    synth = raw.get("syntheseVote") or {}
-    dec   = synth.get("decompte") or {}
-    tv    = raw.get("typeVote") or {}
-    return {
-        "uid":               raw.get("uid"),
-        "chambre":           "AN",
-        "numero":            int(raw.get("numero") or 0),
-        "legislature":       int(raw.get("legislature") or 17),
-        "date":              raw.get("dateScrutin"),
-        "titre":             raw.get("titre"),
-        "type_vote_code":    tv.get("codeTypeVote"),
-        "type_vote_libelle": tv.get("libelleTypeVote"),
-        "sort":              (raw.get("sort") or {}).get("code"),
-        "pour":              int(dec.get("pour") or 0),
-        "contre":            int(dec.get("contre") or 0),
-        "abstentions":       int(dec.get("abstentions") or 0),
-        "non_votants":       int(dec.get("nonVotants") or 0),
-        "votants":           int(synth.get("nombreVotants") or 0),
-        "suffrages":         int(synth.get("suffragesExprimes") or 0),
-    }
-
-def parse_votes(raw):
-    uid = raw.get("uid")
-    votes = []
-    gpes = ((raw.get("ventilationVotes") or {}).get("organe") or {})
-    groupes = (gpes.get("groupes") or {}).get("groupe", [])
-    if isinstance(groupes, dict): groupes = [groupes]
-    for g in groupes:
-        dn = (g.get("vote") or {}).get("decompteNominatif") or {}
-        for key, position in POSITION_MAP.items():
-            for v in extract_votants(dn.get(key)):
-                acteur = v.get("acteurRef")
-                if acteur and uid:
-                    votes.append({
-                        "scrutin_uid":    uid,
-                        "acteur_uid":     acteur,
-                        "position":       position,
-                        "par_delegation": 1 if v.get("parDelegation") == "true" else 0,
-                    })
-    return votes
+    v = section.get("votant",[])
+    return [v] if isinstance(v,dict) else (v or [])
 
 def main():
-    db = TursoClient()
+    # Dernier scrutin
+    out = turso("SELECT MAX(numero) as n FROM scrutins WHERE chambre='AN';")
+    last_num = 0
+    for line in out.split("\n"):
+        line = line.strip().strip("|").strip()
+        try: last_num = int(line); break
+        except: pass
+    print(f"  Dernier scrutin en base: #{last_num}", flush=True)
 
-    # Dernier scrutin en base
-    rows = db.execute("SELECT MAX(numero) as max_num FROM scrutins WHERE chambre = 'AN'")
-    last_num = int(rows[0]["max_num"] or 0) if rows else 0
-    print(f"  Dernier scrutin en base : #{last_num}", flush=True)
+    print("  ↓ Scrutins...", flush=True)
+    with urllib.request.urlopen(SCRUTINS_URL, timeout=120) as r:
+        data = r.read()
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        z.extractall("/tmp/scrutins_new")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        zip_path = f"{tmp}/scrutins.zip"
-        print(f"  ↓ Scrutins AN...", flush=True)
-        urllib.request.urlretrieve(SCRUTINS_URL, zip_path)
+    files = sorted(glob.glob("/tmp/scrutins_new/json/*.json"))
+    sql_path = "/tmp/scrutins.sql"
+    new_s = new_v = 0
 
-        with zipfile.ZipFile(zip_path) as z:
-            z.extractall(tmp)
-
-        json_files = sorted(glob.glob(f"{tmp}/json/*.json"))
-        print(f"  {len(json_files)} scrutins au total, {last_num} déjà en base", flush=True)
-
-        new_scrutins = []
-        new_votes    = []
-
-        for fpath in json_files:
-            try:
-                raw = json.load(open(fpath))["scrutin"]
-            except Exception:
-                continue
-
+    with open(sql_path,"w") as f:
+        for fp in files:
+            try: raw = json.load(open(fp))["scrutin"]
+            except: continue
             num = int(raw.get("numero") or 0)
-            if num <= last_num:
-                continue  # déjà en base
+            if num <= last_num: continue
+            uid = raw.get("uid")
+            synth = raw.get("syntheseVote") or {}; dec = synth.get("decompte") or {}; tv = raw.get("typeVote") or {}
+            sort_code = (raw.get("sort") or {}).get("code")
+            f.write(f"INSERT OR IGNORE INTO scrutins VALUES ({esc(uid)},'AN',{num},17,{esc(raw.get('dateScrutin'))},{esc(raw.get('titre'))},{esc(tv.get('codeTypeVote'))},{esc(tv.get('libelleTypeVote'))},{esc(sort_code)},{int(dec.get('pour') or 0)},{int(dec.get('contre') or 0)},{int(dec.get('abstentions') or 0)},{int(dec.get('nonVotants') or 0)},{int(synth.get('nombreVotants') or 0)},{int(synth.get('suffragesExprimes') or 0)});\n")
+            new_s += 1
+            gpes = ((raw.get("ventilationVotes") or {}).get("organe") or {})
+            groupes = (gpes.get("groupes") or {}).get("groupe",[])
+            if isinstance(groupes,dict): groupes=[groupes]
+            for g in groupes:
+                dn = (g.get("vote") or {}).get("decompteNominatif") or {}
+                for key,pos in POSITION_MAP.items():
+                    for v in (extract_votants(dn.get(key))):
+                        acteur = v.get("acteurRef")
+                        if acteur and uid:
+                            deleg = 1 if v.get("parDelegation")=="true" else 0
+                            f.write(f"INSERT OR IGNORE INTO votes VALUES ({esc(uid)},{esc(acteur)},{esc(pos)},{deleg});\n")
+                            new_v += 1
 
-            new_scrutins.append(parse_scrutin(raw))
-            new_votes.extend(parse_votes(raw))
+    if new_s == 0:
+        print("  ✓ Aucun nouveau scrutin."); return
 
-    if not new_scrutins:
-        print("  ✓ Aucun nouveau scrutin.")
-        return
+    print(f"  {new_s} nouveaux scrutins, {new_v} votes → Turso...", flush=True)
+    turso_file(sql_path)
+    print(f"  ✓ Scrutins #{last_num+1}→#{last_num+new_s} importés")
 
-    print(f"  {len(new_scrutins)} nouveaux scrutins, {len(new_votes)} votes → Turso...", flush=True)
-    db.batch_insert("scrutins", new_scrutins)
-    db.batch_insert("votes", new_votes)
-    print(f"  ✓ Scrutins #{last_num + 1} → #{last_num + len(new_scrutins)} importés")
-
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()

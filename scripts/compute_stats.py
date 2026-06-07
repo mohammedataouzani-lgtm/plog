@@ -1,151 +1,121 @@
 """
 scripts/compute_stats.py
-Calcule participation_rate et rebellion_rate pour chaque député
-et les synchronise dans la table stats_deputes sur Turso.
-
-Logique :
-  participation_rate = votes actifs (pour/contre/abstention) / votes totaux enregistrés
-  rebellion_rate     = votes ≠ majorité du groupe / votes actifs
-                       (NI exclus car groupe non cohérent)
+Calcule participation_rate et rebellion_rate via Turso CLI.
 """
-
-import sys
-import os
-import json
-import urllib.request
+import os, sys, json, subprocess, datetime, urllib.request
 from collections import defaultdict, Counter
 
-sys.path.insert(0, os.path.dirname(__file__))
-from turso_client import TursoClient
+def db_name():
+    url = os.environ["TURSO_DATABASE_URL"].replace("libsql://", "")
+    return url.split(".")[0]
 
-GROUPES_EXCLUS_REBELLION = {"NI", None}
+def turso(sql):
+    r = subprocess.run(["turso", "db", "shell", db_name(), sql],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"  ⚠ {r.stderr[:200]}", flush=True)
+    return r.stdout
 
+def turso_file(path):
+    with open(path) as f:
+        lines = [l for l in f.read().split("\n") if l.strip()]
+    BLOC = 200
+    for i in range(0, len(lines), BLOC):
+        bloc = "\n".join(lines[i:i+BLOC])
+        r = subprocess.run(["turso", "db", "shell", db_name(), bloc],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  ⚠ bloc {i//BLOC}: {r.stderr[:100]}", flush=True)
+        if (i // BLOC) % 10 == 0:
+            print(f"  {min(i+BLOC,len(lines))}/{len(lines)} lignes", flush=True)
+
+def get_deputes():
+    out = turso("SELECT uid, groupe_abrev FROM deputes WHERE groupe_abrev IS NOT NULL;")
+    result = {}
+    for line in out.split("\n"):
+        parts = [p.strip().strip("|").strip() for p in line.split("|") if p.strip()]
+        if len(parts) == 2 and parts[0].startswith("PA"):
+            result[parts[0]] = parts[1]
+    return result
+
+def get_votes():
+    """Charge les votes par blocs depuis Turso CLI."""
+    print("  Chargement des votes...", flush=True)
+    out = turso("SELECT acteur_uid, scrutin_uid, position FROM votes WHERE acteur_uid IN (SELECT uid FROM deputes);")
+    votes = []
+    for line in out.split("\n"):
+        parts = [p.strip().strip("|").strip() for p in line.split("|") if p.strip()]
+        if len(parts) == 3 and parts[0].startswith("PA"):
+            votes.append((parts[0], parts[1], parts[2]))
+    return votes
 
 def main():
-    db = TursoClient()
-
-    # ── 1. Récupérer les groupes des députés ──────────────────────────────────
-    print("  Chargement des groupes...", flush=True)
-    deputes_rows = db.execute("SELECT uid, groupe_abrev FROM deputes WHERE groupe_abrev IS NOT NULL")
-    deputes_groupe = {r["uid"]: r["groupe_abrev"] for r in deputes_rows}
-    deputes_uids = set(deputes_groupe.keys())
-    print(f"  {len(deputes_uids)} députés", flush=True)
-
-    # ── 2. Charger tous les votes ─────────────────────────────────────────────
-    print("  Chargement des votes (peut prendre 1 min)...", flush=True)
-    BATCH = 50_000
-    offset = 0
-    all_votes = []
-
-    while True:
-        chunk = db.execute(
-            f"SELECT acteur_uid, scrutin_uid, position FROM votes LIMIT {BATCH} OFFSET {offset}"
-        )
-        if not chunk:
-            break
-        all_votes.extend(chunk)
-        offset += BATCH
-        if len(chunk) < BATCH:
-            break
-
-    print(f"  {len(all_votes):,} votes chargés", flush=True)
-
-    # ── 3. Indexation ─────────────────────────────────────────────────────────
-    votes_par_depute  = defaultdict(list)
-    votes_par_sg      = defaultdict(list)   # (scrutin_uid, groupe) → [positions]
-
-    for v in all_votes:
-        uid      = v["acteur_uid"]
-        scr      = v["scrutin_uid"]
-        position = v["position"]
-        if uid not in deputes_uids:
-            continue
-        votes_par_depute[uid].append((scr, position))
-        groupe = deputes_groupe.get(uid)
-        if groupe and groupe not in GROUPES_EXCLUS_REBELLION:
-            votes_par_sg[(scr, groupe)].append(position)
-
-    # ── 4. Majorité de groupe par scrutin ─────────────────────────────────────
-    print("  Calcul majorités de groupe...", flush=True)
-    majority = {}
-    for (scr, groupe), positions in votes_par_sg.items():
-        actifs = [p for p in positions if p not in ("nonVotant", "nonVotantVolontaire")]
-        if actifs:
-            majority[(scr, groupe)] = Counter(actifs).most_common(1)[0][0]
-
-    # ── 5. Stats par député ───────────────────────────────────────────────────
-    print("  Calcul stats individuelles...", flush=True)
+    today = datetime.date.today().isoformat()
     ABSENTS = {"nonVotant", "nonVotantVolontaire"}
-    stats = {}
+    NI_EXCLU = {"NI", None}
 
-    for uid, vote_list in votes_par_depute.items():
-        groupe = deputes_groupe.get(uid)
+    print("Chargement des groupes...", flush=True)
+    deputes_groupe = get_deputes()
+    print(f"  {len(deputes_groupe)} députés", flush=True)
+
+    rows_votes = get_votes()
+    print(f"  {len(rows_votes):,} votes chargés", flush=True)
+
+    # Indexation
+    votes_dep = defaultdict(list)
+    votes_sg  = defaultdict(list)
+    for uid, scr, pos in rows_votes:
+        votes_dep[uid].append((scr, pos))
+        g = deputes_groupe.get(uid)
+        if g and g not in NI_EXCLU:
+            votes_sg[(scr, g)].append(pos)
+
+    # Majorité groupe
+    print("  Calcul majorités...", flush=True)
+    majority = {}
+    for (scr, g), positions in votes_sg.items():
+        actifs = [p for p in positions if p not in ABSENTS]
+        if actifs:
+            majority[(scr, g)] = Counter(actifs).most_common(1)[0][0]
+
+    # Stats par député
+    print("  Calcul stats...", flush=True)
+    stats = {}
+    for uid, vote_list in votes_dep.items():
+        g = deputes_groupe.get(uid)
         total  = len(vote_list)
         actifs = sum(1 for _, p in vote_list if p not in ABSENTS)
-
-        rebellion_total = 0
-        rebellions      = 0
-
-        if groupe and groupe not in GROUPES_EXCLUS_REBELLION:
-            for scr, position in vote_list:
-                if position in ABSENTS:
-                    continue
-                maj = majority.get((scr, groupe))
+        reb_t = reb = 0
+        if g and g not in NI_EXCLU:
+            for scr, pos in vote_list:
+                if pos in ABSENTS: continue
+                maj = majority.get((scr, g))
                 if maj:
-                    rebellion_total += 1
-                    if position != maj:
-                        rebellions += 1
+                    reb_t += 1
+                    if pos != maj: reb += 1
+        stats[uid] = (total, actifs,
+            round(actifs/total*100, 1) if total else 0,
+            reb_t, reb,
+            round(reb/reb_t*100, 1) if reb_t else None)
 
-        stats[uid] = {
-            "uid":                   uid,
-            "votes_total":           total,
-            "votes_actifs":          actifs,
-            "participation_rate":    round(actifs / total * 100, 1) if total else 0.0,
-            "votes_pour_rebellion":  rebellion_total,
-            "rebellions":            rebellions,
-            "rebellion_rate":        round(rebellions / rebellion_total * 100, 1) if rebellion_total else None,
-        }
+    avg_part = sum(s[2] for s in stats.values()) / len(stats)
+    avg_reb_vals = [s[5] for s in stats.values() if s[5] is not None]
+    avg_reb = sum(avg_reb_vals) / len(avg_reb_vals) if avg_reb_vals else 0
+    print(f"  Participation moyenne: {avg_part:.1f}%, Rébellion: {avg_reb:.1f}%", flush=True)
 
-    # ── 6. Moyennes par groupe (pour comparaison) ─────────────────────────────
-    groupe_participation = defaultdict(list)
-    groupe_rebellion     = defaultdict(list)
+    # Générer SQL
+    sql_path = "/tmp/stats.sql"
+    with open(sql_path, "w") as f:
+        f.write("DROP TABLE IF EXISTS stats_deputes;\n")
+        f.write("CREATE TABLE stats_deputes (uid TEXT PRIMARY KEY, votes_total INTEGER, votes_actifs INTEGER, participation_rate REAL, votes_pour_rebellion INTEGER, rebellions INTEGER, rebellion_rate REAL, updated_at TEXT);\n")
+        for uid, (total, actifs, part, reb_t, reb, reb_rate) in stats.items():
+            uid_s = uid.replace("'","''")
+            reb_val = str(reb_rate) if reb_rate is not None else "NULL"
+            f.write(f"INSERT INTO stats_deputes VALUES ('{uid_s}',{total},{actifs},{part},{reb_t},{reb},{reb_val},'{today}');\n")
 
-    for uid, s in stats.items():
-        g = deputes_groupe.get(uid)
-        if g:
-            groupe_participation[g].append(s["participation_rate"])
-            if s["rebellion_rate"] is not None:
-                groupe_rebellion[g].append(s["rebellion_rate"])
-
-    avg_part_global = sum(s["participation_rate"] for s in stats.values()) / len(stats)
-    avg_reb_global  = sum(s["rebellion_rate"] for s in stats.values() if s["rebellion_rate"] is not None)
-    avg_reb_global  = avg_reb_global / sum(1 for s in stats.values() if s["rebellion_rate"] is not None)
-
-    print(f"  Participation moyenne: {avg_part_global:.1f}%")
-    print(f"  Rébellion moyenne: {avg_reb_global:.1f}%")
-
-    # ── 7. Créer / recréer la table ───────────────────────────────────────────
-    print("  Sync Turso...", flush=True)
-    db.execute("DROP TABLE IF EXISTS stats_deputes")
-    db.execute("""
-        CREATE TABLE stats_deputes (
-            uid                   TEXT PRIMARY KEY,
-            votes_total           INTEGER,
-            votes_actifs          INTEGER,
-            participation_rate    REAL,
-            votes_pour_rebellion  INTEGER,
-            rebellions            INTEGER,
-            rebellion_rate        REAL,
-            updated_at            TEXT
-        )
-    """)
-
-    today = __import__("datetime").date.today().isoformat()
-    rows = [{**s, "updated_at": today} for s in stats.values()]
-    db.batch_insert("stats_deputes", rows, replace=True)
-
-    print(f"  ✓ {len(rows)} stats synchronisées")
-
+    print(f"  Injection {len(stats)} lignes → Turso...", flush=True)
+    turso_file(sql_path)
+    print("✓ Stats synchronisées")
 
 if __name__ == "__main__":
     main()
