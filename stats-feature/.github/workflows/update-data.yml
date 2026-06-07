@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       force_full:
-        description: 'Forcer mise à jour complète archives'
+        description: 'Forcer mise à jour complète'
         required: false
         default: 'false'
 
@@ -14,7 +14,7 @@ jobs:
   update:
     name: Mise à jour données
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -42,6 +42,12 @@ jobs:
 
       - name: Calcul stats (participation + rébellion)
         run: python scripts/compute_stats.py
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+
+      - name: Mise à jour activité (commissions + questions + amendements)
+        run: python scripts/update_activite.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}

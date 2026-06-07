@@ -130,7 +130,15 @@ export async function getDeputes(opts: {
 }
 
 export async function getDepute(uid: string): Promise<Depute | null> {
-  return row<Depute>("SELECT * FROM deputes WHERE uid = ?", [uid]);
+  return row<Depute>(`
+    SELECT d.*,
+           s.participation_rate, s.rebellion_rate, s.votes_total,
+           a.nb_presences_commission, a.nb_questions_ecrites,
+           a.nb_questions_orales, a.nb_amendements, a.nb_amendements_adoptes
+    FROM deputes d
+    LEFT JOIN stats_deputes s ON d.uid = s.uid
+    LEFT JOIN activite_deputes a ON d.uid = a.uid
+    WHERE d.uid = ?`, [uid]);
 }
 
 export async function getSenateurs(opts: {

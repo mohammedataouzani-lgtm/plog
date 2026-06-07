@@ -39,16 +39,31 @@ function StatBar({ label, n, total, color }: { label: string; n: number; total: 
   );
 }
 
+function ActivityCard({ icon, label, value, sub }: { icon: string; label: string; value: number; sub?: string }) {
+  return (
+    <div className="border border-border p-4 flex flex-col gap-1">
+      <span className="text-lg">{icon}</span>
+      <div className="font-display text-2xl font-light">{value.toLocaleString("fr")}</div>
+      <div className="text-xs text-muted uppercase tracking-wide">{label}</div>
+      {sub && <div className="text-[10px] text-muted">{sub}</div>}
+    </div>
+  );
+}
+
 export default async function DeputePage({ params, searchParams }: Props) {
   const dep = await getDepute(params.uid);
   if (!dep) notFound();
 
   const vpage = Math.max(1, parseInt(searchParams.vpage ?? "1"));
   const vpos  = searchParams.vpos;
+
   const [stats, votes] = await Promise.all([
     getStatsVotesActeur(params.uid),
     getVotesActeur(params.uid, { page: vpage, pageSize: 30, position: vpos }),
   ]);
+
+  // Activité parlementaire (jointure via db.ts)
+  const activite = (dep as any);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -56,6 +71,7 @@ export default async function DeputePage({ params, searchParams }: Props) {
         ← Députés
       </Link>
 
+      {/* En-tête */}
       <div className="border-b border-border pb-8 mb-8">
         <div className="flex items-start gap-3 flex-wrap mb-4">
           <GroupeBadge abrev={dep.groupe_abrev} libelle={dep.groupe_libelle} chambre="AN" size="md" />
@@ -70,15 +86,30 @@ export default async function DeputePage({ params, searchParams }: Props) {
         <CompareButton uid={dep.uid} nom={dep.nom ?? ""} prenom={dep.prenom} chambre="AN" />
       </div>
 
+      {/* Stats votes */}
       {stats.total > 0 && (
         <div className="border border-border p-5 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-xl font-light">Activité de vote</h2>
             <span className="text-xs text-muted">{stats.total.toLocaleString("fr")} scrutins</span>
           </div>
-          <div className="flex items-center gap-2 mb-5">
-            <div className="font-display text-3xl font-light">{stats.participation}%</div>
-            <span className="text-sm text-muted">de participation</span>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-xs text-muted uppercase tracking-wide mb-1">Participation</div>
+              <div className="font-display text-3xl font-light">{stats.participation}%</div>
+              {dep.participation_rate !== null && (
+                <div className="text-[10px] text-muted">Calculé: {dep.participation_rate}%</div>
+              )}
+            </div>
+            {dep.rebellion_rate !== null && (
+              <div>
+                <div className="text-xs text-muted uppercase tracking-wide mb-1">Rébellion</div>
+                <div className={`font-display text-3xl font-light ${dep.rebellion_rate > 10 ? "text-orange-600" : ""}`}>
+                  {dep.rebellion_rate}%
+                </div>
+                <div className="text-[10px] text-muted">votes contre son groupe</div>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <StatBar label="Pour"       n={stats.pour}       total={stats.total} color="bg-emerald-500" />
@@ -89,6 +120,38 @@ export default async function DeputePage({ params, searchParams }: Props) {
         </div>
       )}
 
+      {/* Activité parlementaire */}
+      {((activite.nb_presences_commission ?? 0) + (activite.nb_questions_ecrites ?? 0) +
+        (activite.nb_questions_orales ?? 0) + (activite.nb_amendements ?? 0)) > 0 && (
+        <div className="mb-8">
+          <h2 className="font-display text-xl font-light mb-4">Activité parlementaire</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <ActivityCard
+              icon="🏛️"
+              label="Présences commission"
+              value={activite.nb_presences_commission ?? 0}
+            />
+            <ActivityCard
+              icon="✍️"
+              label="Questions écrites"
+              value={activite.nb_questions_ecrites ?? 0}
+            />
+            <ActivityCard
+              icon="🎤"
+              label="Questions orales"
+              value={activite.nb_questions_orales ?? 0}
+            />
+            <ActivityCard
+              icon="📝"
+              label="Amendements"
+              value={activite.nb_amendements ?? 0}
+              sub={activite.nb_amendements_adoptes ? `${activite.nb_amendements_adoptes} adoptés` : undefined}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Infos mandat */}
       <div className="border-t border-border mb-8">
         <Field label="Groupe"          value={dep.groupe_libelle} />
         <Field label="Commission"      value={dep.commission} />
@@ -104,6 +167,7 @@ export default async function DeputePage({ params, searchParams }: Props) {
         )}
       </div>
 
+      {/* Historique votes */}
       {votes.data.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
