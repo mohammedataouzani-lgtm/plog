@@ -25,8 +25,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Installer dépendances
+      - name: Installer dépendances Python
         run: pip install requests
+
+      - name: Installer Turso CLI
+        run: |
+          curl -sSfL https://get.tur.so/install.sh | bash
+          echo "$HOME/.turso/bin" >> $GITHUB_PATH
+
+      - name: Authentifier Turso CLI
+        run: |
+          export PATH="$HOME/.turso/bin:$PATH"
+          turso auth login --headless
+        env:
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Mise à jour élus (AN + Sénat)
         run: python scripts/update_elus.py
@@ -40,13 +52,13 @@ jobs:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
-      - name: Calcul stats (participation + rébellion)
+      - name: Calcul stats participation + rébellion
         run: python scripts/compute_stats.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
-      - name: Mise à jour activité (commissions + questions + amendements)
+      - name: Mise à jour activité (commissions, questions, amendements)
         run: python scripts/update_activite.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
