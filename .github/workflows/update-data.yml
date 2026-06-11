@@ -46,7 +46,13 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Calcul stats participation + rebellion
-        run: python scripts/compute_stats.py
+        run: |
+          echo "=== Version compute_stats ==="
+          head -3 scripts/compute_stats.py
+          echo "=== urllib dans le fichier ==="
+          grep -c "urllib" scripts/compute_stats.py || echo "0"
+          echo "=== Execution ==="
+          python scripts/compute_stats.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
