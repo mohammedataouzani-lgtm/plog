@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getSenateur } from "@/lib/db";
 import GroupeBadge from "@/components/GroupeBadge";
 import CompareButton from "@/components/CompareButton";

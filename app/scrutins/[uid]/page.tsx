@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getScrutin, getVotesPourScrutin } from "@/lib/db";
 import GroupeBadge from "@/components/GroupeBadge";
 import VoteBadge from "@/components/VoteBadge";

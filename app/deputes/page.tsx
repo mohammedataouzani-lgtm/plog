@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getDeputes } from "@/lib/db";
 import GroupeBadge from "@/components/GroupeBadge";
 import StatutBadge from "@/components/StatutBadge";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getSenateurs } from "@/lib/db";
 import GroupeBadge from "@/components/GroupeBadge";
 import FilterBar from "@/components/FilterBar";

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getScrutins } from "@/lib/db";
 import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";

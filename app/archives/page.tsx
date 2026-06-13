@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getArchives } from "@/lib/db";
 import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";
