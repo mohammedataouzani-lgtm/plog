@@ -55,7 +55,7 @@ export default async function DeputePage({ params, searchParams }: Props) {
   if (!dep) notFound();
 
   const vpage = Math.max(1, parseInt(searchParams.vpage ?? "1"));
-  const vpos  = searchParams.vpos;
+  const vpos = searchParams.vpos;
 
   const [stats, votes] = await Promise.all([
     getStatsVotesActeur(params.uid),
@@ -112,57 +112,63 @@ export default async function DeputePage({ params, searchParams }: Props) {
             )}
           </div>
           <div className="space-y-2">
-            <StatBar label="Pour"       n={stats.pour}       total={stats.total} color="bg-emerald-500" />
-            <StatBar label="Contre"     n={stats.contre}     total={stats.total} color="bg-red-400" />
+            <StatBar label="Pour" n={stats.pour} total={stats.total} color="bg-emerald-500" />
+            <StatBar label="Contre" n={stats.contre} total={stats.total} color="bg-red-400" />
             <StatBar label="Abstention" n={stats.abstention} total={stats.total} color="bg-amber-300" />
-            <StatBar label="Absent"     n={stats.nonVotant}  total={stats.total} color="bg-gray-200" />
+            <StatBar label="Absent" n={stats.nonVotant} total={stats.total} color="bg-gray-200" />
           </div>
         </div>
       )}
 
       {/* Activité parlementaire */}
       {((activite.nb_presences_commission ?? 0) + (activite.nb_questions_ecrites ?? 0) +
-        (activite.nb_questions_orales ?? 0) + (activite.nb_amendements ?? 0)) > 0 && (
-        <div className="mb-8">
-          <h2 className="font-display text-xl font-light mb-4">Activité parlementaire</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <ActivityCard
-              icon="🏛️"
-              label="Présences commission"
-              value={activite.nb_presences_commission ?? 0}
-            />
-            <ActivityCard
-              icon="✍️"
-              label="Questions écrites"
-              value={activite.nb_questions_ecrites ?? 0}
-            />
-            <ActivityCard
-              icon="🎤"
-              label="Questions orales"
-              value={activite.nb_questions_orales ?? 0}
-            />
-            <ActivityCard
-              icon="📝"
-              label="Amendements"
-              value={activite.nb_amendements ?? 0}
-              sub={activite.nb_amendements_adoptes ? `${activite.nb_amendements_adoptes} adoptés` : undefined}
-            />
+        (activite.nb_questions_orales ?? 0) + (activite.nb_amendements_deposes ?? 0) +
+        (activite.nb_amendements_signes ?? 0)) > 0 && (
+          <div className="mb-8">
+            <h2 className="font-display text-xl font-light mb-4">Activité parlementaire</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <ActivityCard
+                icon="🏛️"
+                label="Présences commission"
+                value={activite.nb_presences_commission ?? 0}
+              />
+              <ActivityCard
+                icon="✍️"
+                label="Questions écrites"
+                value={activite.nb_questions_ecrites ?? 0}
+              />
+              <ActivityCard
+                icon="🎤"
+                label="Questions orales"
+                value={activite.nb_questions_orales ?? 0}
+              />
+              <ActivityCard
+                icon="📝"
+                label="Amendements déposés"
+                value={activite.nb_amendements_deposes ?? 0}
+                sub={activite.nb_amendements_adoptes ? `${activite.nb_amendements_adoptes} adoptés` : undefined}
+              />
+              <ActivityCard
+                icon="🤝"
+                label="Amendements signés"
+                value={activite.nb_amendements_signes ?? 0}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Infos mandat */}
       <div className="border-t border-border mb-8">
-        <Field label="Groupe"          value={dep.groupe_libelle} />
-        <Field label="Commission"      value={dep.commission} />
-        <Field label="Département"     value={dep.departement} />
-        <Field label="Profession"      value={dep.profession} />
-        <Field label="Naissance"       value={dep.date_naissance} />
-        <Field label="Mandat depuis"   value={dep.date_debut_mandat} />
+        <Field label="Groupe" value={dep.groupe_libelle} />
+        <Field label="Commission" value={dep.commission} />
+        <Field label="Département" value={dep.departement} />
+        <Field label="Profession" value={dep.profession} />
+        <Field label="Naissance" value={dep.date_naissance} />
+        <Field label="Mandat depuis" value={dep.date_debut_mandat} />
         {dep.statut === "mandat_termine" && (
           <>
             <Field label="Fin de mandat" value={dep.date_fin_mandat} />
-            <Field label="Motif"         value={dep.raison_fin} />
+            <Field label="Motif" value={dep.raison_fin} />
           </>
         )}
       </div>
@@ -200,8 +206,8 @@ export default async function DeputePage({ params, searchParams }: Props) {
             <div className="flex justify-between items-center mt-4 pt-3 border-t border-border">
               <span className="text-xs text-muted">Page {votes.page}/{votes.totalPages} · {votes.total.toLocaleString("fr")} votes</span>
               <div className="flex gap-1">
-                {vpage > 1 && <Link href={`/deputes/${params.uid}?vpage=${vpage-1}${vpos ? `&vpos=${vpos}` : ""}`} className="px-3 py-1 text-xs border border-border hover:border-text">←</Link>}
-                {vpage < votes.totalPages && <Link href={`/deputes/${params.uid}?vpage=${vpage+1}${vpos ? `&vpos=${vpos}` : ""}`} className="px-3 py-1 text-xs border border-border hover:border-text">→</Link>}
+                {vpage > 1 && <Link href={`/deputes/${params.uid}?vpage=${vpage - 1}${vpos ? `&vpos=${vpos}` : ""}`} className="px-3 py-1 text-xs border border-border hover:border-text">←</Link>}
+                {vpage < votes.totalPages && <Link href={`/deputes/${params.uid}?vpage=${vpage + 1}${vpos ? `&vpos=${vpos}` : ""}`} className="px-3 py-1 text-xs border border-border hover:border-text">→</Link>}
               </div>
             </div>
           )}

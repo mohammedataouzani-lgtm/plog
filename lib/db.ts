@@ -106,17 +106,17 @@ export async function getDeputes(opts: {
 }): Promise<PaginatedResult<Depute>> {
   const { page = 1, pageSize = 60, groupe, departement, statut, q, tri = "nom" } = opts;
   const where: string[] = []; const p: Record<string, any> = {};
-  if (groupe)      { where.push("d.groupe_abrev = :groupe");             p.groupe = groupe; }
-  if (departement) { where.push("d.num_departement = :dept");            p.dept   = departement; }
-  if (statut)      { where.push("d.statut = :statut");                   p.statut = statut; }
-  if (q)           { where.push("(d.nom LIKE :q OR d.prenom LIKE :q)");  p.q      = `%${q}%`; }
+  if (groupe) { where.push("d.groupe_abrev = :groupe"); p.groupe = groupe; }
+  if (departement) { where.push("d.num_departement = :dept"); p.dept = departement; }
+  if (statut) { where.push("d.statut = :statut"); p.statut = statut; }
+  if (q) { where.push("(d.nom LIKE :q OR d.prenom LIKE :q)"); p.q = `%${q}%`; }
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const ORDER = {
-    "nom":                "d.nom, d.prenom",
-    "participation_asc":  "COALESCE(s.participation_rate, 0) ASC",
+    "nom": "d.nom, d.prenom",
+    "participation_asc": "COALESCE(s.participation_rate, 0) ASC",
     "participation_desc": "COALESCE(s.participation_rate, 0) DESC",
-    "rebellion_desc":     "COALESCE(s.rebellion_rate, 0) DESC",
+    "rebellion_desc": "COALESCE(s.rebellion_rate, 0) DESC",
   }[tri] ?? "d.nom, d.prenom";
 
   const JOIN = "LEFT JOIN stats_deputes s ON d.uid = s.uid";
@@ -134,7 +134,8 @@ export async function getDepute(uid: string): Promise<Depute | null> {
     SELECT d.*,
            s.participation_rate, s.rebellion_rate, s.votes_total,
            a.nb_presences_commission, a.nb_questions_ecrites,
-           a.nb_questions_orales, a.nb_amendements, a.nb_amendements_adoptes
+           a.nb_questions_orales, a.nb_amendements_deposes,
+           a.nb_amendements_signes, a.nb_amendements_adoptes
     FROM deputes d
     LEFT JOIN stats_deputes s ON d.uid = s.uid
     LEFT JOIN activite_deputes a ON d.uid = a.uid
