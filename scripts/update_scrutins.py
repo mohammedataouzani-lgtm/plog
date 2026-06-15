@@ -4,20 +4,35 @@ from collections import defaultdict
 SCRUTINS_URL = "http://data.assemblee-nationale.fr/static/openData/repository/17/loi/scrutins/Scrutins.json.zip"
 POSITION_MAP = {"pours":"pour","contres":"contre","abstentions":"abstention","nonVotants":"nonVotant","nonVotantsVolontaires":"nonVotantVolontaire"}
 
+def _turso_http(stmts):
+    base = os.environ["TURSO_DATABASE_URL"].replace("libsql://", "https://").rstrip("/")
+    token = os.environ["TURSO_AUTH_TOKEN"]
+    payload = {"requests": [{"type": "execute", "stmt": {"sql": s}} for s in stmts]}
+    payload["requests"].append({"type": "close"})
+    req = urllib.request.Request(base + "/v2/pipeline",
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST")
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())
+
 def turso(sql):
-    url = os.environ["TURSO_DATABASE_URL"]; token = os.environ["TURSO_AUTH_TOKEN"]
-    r = subprocess.run(["turso","db","shell",url,"--auth-token",token,sql], capture_output=True, text=True)
-    return r.stdout
+    res = _turso_http([sql])
+    rows_out = []
+    for r in res.get("results", []):
+        resp = r.get("response", {})
+        if resp.get("type") != "execute": continue
+        for row in resp.get("result", {}).get("rows", []):
+            vals = [c.get("value") if isinstance(c, dict) else c for c in row]
+            rows_out.append("|".join("" if v is None else str(v) for v in vals))
+    return "\n".join(rows_out)
 
 def turso_file(path):
-    url = os.environ["TURSO_DATABASE_URL"]; token = os.environ["TURSO_AUTH_TOKEN"]
     with open(path) as f:
-        lines = [l for l in f.read().split("\n") if l.strip()]
-    for i in range(0, len(lines), 200):
-        bloc = "\n".join(lines[i:i+200])
-        subprocess.run(["turso","db","shell",url,"--auth-token",token,bloc], capture_output=True)
-        if (i//200)%10==0: print(f"  {min(i+200,len(lines))}/{len(lines)}", flush=True)
-
+        stmts = [l for l in f.read().split("\n") if l.strip()]
+    for i in range(0, len(stmts), 100):
+        _turso_http(stmts[i:i+100])
+        if (i//100)%5==0: print(f"  {min(i+100,len(stmts))}/{len(stmts)}", flush=True)
 def esc(v):
     if v is None: return "NULL"
     return "'" + str(v).replace("'","''") + "'"

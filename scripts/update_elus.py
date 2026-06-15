@@ -12,13 +12,25 @@ URLS = {
 def db_name():
     return os.environ["TURSO_DATABASE_URL"].replace("libsql://","").split(".")[0]
 
+def _turso_http(stmts):
+    base = os.environ["TURSO_DATABASE_URL"].replace("libsql://", "https://").rstrip("/")
+    token = os.environ["TURSO_AUTH_TOKEN"]
+    payload = {"requests": [{"type": "execute", "stmt": {"sql": s}} for s in stmts]}
+    payload["requests"].append({"type": "close"})
+    req = urllib.request.Request(base + "/v2/pipeline",
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST")
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())
+
 def turso_file(path):
     with open(path) as f:
-        lines = [l for l in f.read().split("\n") if l.strip()]
-    for i in range(0, len(lines), 200):
-        bloc = "\n".join(lines[i:i+200])
-        subprocess.run(["turso","db","shell",db_name(),bloc], capture_output=True)
-        if (i//200)%5==0: print(f"  {min(i+200,len(lines))}/{len(lines)}", flush=True)
+        stmts = [l for l in f.read().split("\n") if l.strip()]
+    for i in range(0, len(stmts), 100):
+        _turso_http(stmts[i:i+100])
+        if (i//100)%5==0: print(f"  {min(i+100,len(stmts))}/{len(stmts)}", flush=True)
+
 
 def dl(label, url):
     print(f"  ↓ {label}...", flush=True)

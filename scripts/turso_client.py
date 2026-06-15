@@ -42,8 +42,12 @@ class TursoClient:
             },
         )
 
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            print("TURSO ERROR BODY:", e.read().decode()[:500], flush=True)
+            raise
 
         results = []
         for item in data.get("results", []):
@@ -81,8 +85,8 @@ class TursoClient:
         if isinstance(v, int):
             return {"type": "integer", "value": str(v)}
         if isinstance(v, float):
-            return {"type": "float", "value": str(v)}
-        return {"type": "text", "value": str(v)}
+            return {"type": "float", "value": v}
+        return {"type": "text", "value": v}
 
     @staticmethod
     def _val(v):
