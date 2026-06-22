@@ -310,3 +310,37 @@ export async function getVotesDivergents(uid_a: string, uid_b: string, limit = 5
     ORDER BY s.date DESC LIMIT ?
   `, [uid_a, uid_b, limit]);
 }
+export async function getVotesParGroupe(limit = 3) {
+  const scrutins = await rows<{ uid: string; date: string; titre: string; sort: string; pour: number; contre: number; abstentions: number }>(
+    "SELECT uid,date,titre,sort,pour,contre,abstentions FROM scrutins ORDER BY date DESC LIMIT ?",
+    [limit]
+  );
+  const result = await Promise.all(
+    scrutins.map(async (sc) => {
+      const groupes = await rows<{ abrev: string; libelle: string; pour: number; contre: number; abstention: number }>(
+        `SELECT d.groupe_abrev as abrev, d.groupe_libelle as libelle,
+          SUM(CASE WHEN v.position='pour' THEN 1 ELSE 0 END) as pour,
+          SUM(CASE WHEN v.position='contre' THEN 1 ELSE 0 END) as contre,
+          SUM(CASE WHEN v.position='abstention' THEN 1 ELSE 0 END) as abstention
+        FROM votes v
+        JOIN deputes d ON d.uid = v.acteur_uid
+        WHERE v.scrutin_uid = ? AND d.groupe_abrev IS NOT NULL
+        GROUP BY d.groupe_abrev
+        HAVING (pour + contre + abstention) > 0
+        ORDER BY (pour + contre + abstention) DESC`,
+        [sc.uid]
+      );
+      return {
+        ...sc,
+        groupes: groupes.map(g => ({
+          abrev: g.abrev,
+          libelle: g.libelle,
+          pour: Number(g.pour),
+          contre: Number(g.contre),
+          abstention: Number(g.abstention),
+        })),
+      };
+    })
+  );
+  return result;
+}
