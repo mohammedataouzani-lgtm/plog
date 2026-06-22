@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: { default: "Parlement Transparent", template: "%s — Parlement Transparent" },
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-bg text-text font-body antialiased">
         <Navbar />
         <main>{children}</main>
+        <Analytics />
         <footer className="border-t border-border mt-16 py-8 px-4">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-2 text-xs text-muted">
             <span>Parlement Transparent — Données open data AN & Sénat</span>
