@@ -16,6 +16,9 @@ export default async function HomePage() {
             Le Parlement,<br /><em className="italic">sans filtre.</em>
           </h1>
           <p className="text-muted max-w-xl leading-relaxed">Votes, mandats et propositions des 577 députés et 348 sénateurs.</p>
+          <a href="#" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-6 text-sm font-medium text-an border border-an/40 rounded-full px-4 py-2 hover:bg-an hover:text-white transition-colors">
+            Suivez-nous sur les réseaux →
+          </a>
         </div>
         <div className="border border-border rounded-lg p-6">
           <div className="flex items-center justify-between mb-3">
