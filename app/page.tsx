@@ -1,6 +1,19 @@
 import Link from "next/link";
 export const dynamic = "force-dynamic";
 import { getStats } from "@/lib/db";
+import type { AppProps } from 'next/app';
+import { Analytics } from '@vercel/analytics/next';
+ 
+function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <>
+      <Component {...pageProps} />
+      <Analytics />
+    </>
+  );
+}
+ 
+export default MyApp;
 
 export default async function HomePage() {
   const stats = await getStats();
