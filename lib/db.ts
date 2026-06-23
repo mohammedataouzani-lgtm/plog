@@ -344,3 +344,19 @@ export async function getVotesParGroupe(limit = 3) {
   );
   return result;
 }
+
+export async function getHemicycle() {
+  const ordre = ["LFI-NFP","GDR","ECOS","SOC","DEM","EPR","HOR","LIOT","DR","UDDPLR","RN","NI"];
+  const couleurs: Record<string,string> = {
+    "GDR":"#8f291d","LFI-NFP":"#cf2f1c","ECOS":"#3f9b53","SOC":"#e06a86",
+    "DEM":"#e08a2e","EPR":"#d9ab2c","HOR":"#56b0d2","LIOT":"#7aa94a",
+    "UDDPLR":"#2f5fa8","DR":"#3b7fc4","RN":"#39406d","NI":"#9a948a"
+  };
+  const r = await rows<{ abrev: string; libelle: string; nb: number }>(
+    "SELECT groupe_abrev as abrev, groupe_libelle as libelle, COUNT(*) as nb FROM deputes WHERE statut='actif' AND groupe_abrev IS NOT NULL GROUP BY groupe_abrev"
+  );
+  const map = Object.fromEntries(r.map(g => [g.abrev, { libelle: g.libelle, nb: Number(g.nb) }]));
+  return ordre
+    .filter(a => map[a])
+    .map(a => ({ abrev: a, libelle: map[a].libelle, nb: map[a].nb, couleur: couleurs[a] }));
+}

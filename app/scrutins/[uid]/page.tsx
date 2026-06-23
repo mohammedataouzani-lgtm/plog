@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { getScrutin, getVotesPourScrutin } from "@/lib/db";
 import GroupeBadge from "@/components/GroupeBadge";
+import DecryptageVote from "@/components/DecryptageVote";
 import VoteBadge from "@/components/VoteBadge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -49,6 +50,7 @@ export default async function ScrutinPage({ params }: Props) {
           <span className="text-muted ml-auto">{scrutin.votants} votants</span>
         </div>
       </div>
+      <DecryptageVote votes={votes as any} />
       <div className="space-y-8">
         {POSITIONS.filter(p => ((byPos[p] as any[]) ?? []).length > 0).map(pos => (
           <div key={pos}>

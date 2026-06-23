@@ -1,21 +1,22 @@
 import Link from "next/link";
 export const dynamic = "force-dynamic";
-import { getStats, getVotesParGroupe } from "@/lib/db";
+import { getStats, getVotesParGroupe, getHemicycle } from "@/lib/db";
+import Hemicycle from "@/components/Hemicycle";
 import VotesParGroupe from "@/components/VotesParGroupe";
 
 
 
 export default async function HomePage() {
-  const [stats, votesGroupes] = await Promise.all([getStats(), getVotesParGroupe(3)]);
+  const [stats, votesGroupes, hemicycle] = await Promise.all([getStats(), getVotesParGroupe(3), getHemicycle()]);
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="grid md:grid-cols-[1fr_1.4fr] gap-8 items-start mb-16">
         <div>
-          <p className="text-xs uppercase tracking-widest text-muted mb-4">Données parlementaires françaises</p>
+          <p className="text-xs uppercase tracking-widest text-muted mb-4">Données parlementaires ouvertes · AN & Sénat</p>
           <h1 className="font-display text-5xl md:text-7xl font-light leading-tight mb-6 max-w-3xl">
-            Le Parlement,<br /><em className="italic">sans filtre.</em>
+            <strong className="font-semibold">Le Parlement,</strong><br /><em className="italic" style={{ color: "#000091" }}>sans filtre.</em>
           </h1>
-          <p className="text-muted max-w-xl leading-relaxed">Votes, mandats et propositions des 577 députés et 348 sénateurs.</p>
+          <p className="text-muted max-w-xl leading-relaxed">Tous les votes, mandats et propositions des 577 députés et 348 sénateurs. Une lecture claire de qui décide quoi.</p>
           <a href="#" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-6 text-sm font-medium text-an border border-an/40 rounded-full px-4 py-2 hover:bg-an hover:text-white transition-colors">
             Suivez-nous sur les réseaux →
           </a>
@@ -51,6 +52,7 @@ export default async function HomePage() {
         ))}
       </div>
       <VotesParGroupe scrutins={votesGroupes} />
+      <Hemicycle groupes={hemicycle} />
       <div className="mb-16">
         <h2 className="font-display text-2xl font-light mb-6">Assemblée Nationale — 17<sup>e</sup> législature</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-t border-l border-border">

@@ -23,7 +23,12 @@ export default function Navbar() {
 
       <div className="max-w-7xl mx-auto px-4 flex items-center gap-4 h-14">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-1.5 shrink-0">
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <span className="flex h-4 w-6 rounded-sm overflow-hidden shadow-sm shrink-0" aria-hidden="true">
+            <span className="flex-1 bg-[#000091]" />
+            <span className="flex-1 bg-white" />
+            <span className="flex-1 bg-[#E1000F]" />
+          </span>
           <span className="font-display text-lg font-light tracking-tight">Parlement</span>
           <span className="font-display text-lg font-semibold tracking-tight text-an">Transparent</span>
         </Link>
