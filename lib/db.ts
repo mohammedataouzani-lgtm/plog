@@ -262,6 +262,16 @@ export async function globalSearch(q: string, limit = 10) {
   return { deputes, senateurs, archives, scrutins };
 }
 
+export async function getSitemapUids() {
+  const [deputes, senateurs, scrutins, archives] = await Promise.all([
+    rows<{ uid: string }>("SELECT uid FROM deputes"),
+    rows<{ uid: string }>("SELECT uid FROM senateurs"),
+    rows<{ uid: string }>("SELECT uid FROM scrutins"),
+    rows<{ uid: string; chambre: string }>("SELECT uid, chambre FROM archives"),
+  ]);
+  return { deputes, senateurs, scrutins, archives };
+}
+
 export async function getStats() {
   const [d, s, a, sc, gAN, gSen, recents] = await Promise.all([
     row<{ n: number }>("SELECT COUNT(*) as n FROM deputes WHERE statut='actif'"),

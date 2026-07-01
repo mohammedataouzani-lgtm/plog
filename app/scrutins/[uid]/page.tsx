@@ -11,7 +11,14 @@ interface Props { params: { uid: string } }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const s = await getScrutin(params.uid);
   if (!s) return { title: "Scrutin introuvable" };
-  return { title: `Scrutin #${s.numero}` };
+  const titre = s.titre ?? `Scrutin #${s.numero}`;
+  const desc = `Résultat du scrutin "${titre}" (${s.date ?? ""}) : ${s.pour} pour, ${s.contre} contre, ${s.abstentions} abstentions. Détail des votes par groupe politique.`;
+  return {
+    title: titre,
+    description: desc,
+    openGraph: { title: titre, description: desc },
+    alternates: { canonical: `/scrutins/${s.uid}` },
+  };
 }
 const POSITIONS = ["pour", "contre", "abstention", "nonVotant", "nonVotantVolontaire"] as const;
 export default async function ScrutinPage({ params }: Props) {

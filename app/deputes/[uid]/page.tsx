@@ -17,7 +17,14 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const dep = await getDepute(params.uid);
   if (!dep) return { title: "Député introuvable" };
-  return { title: `${dep.prenom} ${dep.nom}` };
+  const nom = `${dep.prenom} ${dep.nom}`;
+  const desc = `${nom}, député${dep.statut === "actif" ? "" : " (ancien)"} de ${dep.departement ?? "France"}${dep.groupe_libelle ? `, groupe ${dep.groupe_libelle}` : ""}. Votes, présence en commission et amendements sur Parlement Transparent.`;
+  return {
+    title: nom,
+    description: desc,
+    openGraph: { title: `${nom} — Député`, description: desc },
+    alternates: { canonical: `/deputes/${dep.uid}` },
+  };
 }
 
 function Field({ label, value }: { label: string; value: string | number | null | undefined }) {

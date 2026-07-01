@@ -12,7 +12,14 @@ interface Props { params: { uid: string } }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const s = await getSenateur(params.uid);
   if (!s) return { title: "Sénateur introuvable" };
-  return { title: `${s.prenom} ${s.nom}` };
+  const nom = `${s.prenom} ${s.nom}`;
+  const desc = `${nom}, sénateur${s.circonscription ? ` de ${s.circonscription}` : ""}${s.groupe ? `, groupe ${s.groupe}` : ""}. Votes et activité au Sénat sur Parlement Transparent.`;
+  return {
+    title: nom,
+    description: desc,
+    openGraph: { title: `${nom} — Sénateur`, description: desc },
+    alternates: { canonical: `/senateurs/${s.uid}` },
+  };
 }
 
 function Field({ label, value }: { label: string; value: string | number | null | undefined }) {

@@ -4,8 +4,26 @@ import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
-  title: { default: "Parlement Transparent", template: "%s — Parlement Transparent" },
-  description: "Accès simplifié aux votes, présences et propositions des parlementaires français.",
+  metadataBase: new URL("https://parlement-transparent.vercel.app"),
+  title: { default: "Parlement Transparent — Votes et activité des députés et sénateurs", template: "%s — Parlement Transparent" },
+  description: "Consultez les votes, la présence et les propositions des 577 députés et 348 sénateurs français. Assemblée Nationale et Sénat réunis, données open data mises à jour chaque nuit.",
+  keywords: ["député", "sénateur", "Assemblée Nationale", "Sénat", "vote", "scrutin", "parlement français", "transparence", "open data", "France"],
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: "Parlement Transparent",
+    title: "Parlement Transparent — Votes et activité des députés et sénateurs",
+    description: "Accès simplifié aux votes, présences et propositions des parlementaires français.",
+    url: "https://parlement-transparent.vercel.app",
+  },
+  twitter: {
+    card: "summary",
+    title: "Parlement Transparent",
+    description: "Accès simplifié aux votes, présences et propositions des parlementaires français.",
+  },
+  alternates: {
+    canonical: "https://parlement-transparent.vercel.app",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
