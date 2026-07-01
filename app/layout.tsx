@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://parlement-transparent.vercel.app",
   },
+  verification: {
+    google: "NU-ZIWh17MW9jZ_Ji3z-BJClnBfnRuiwhwRUOz8-ImQ",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
