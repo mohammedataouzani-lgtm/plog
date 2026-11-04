@@ -83,6 +83,7 @@ export interface VoteCommun {
 async function rows<T>(sql: string, args: Record<string, any> | any[] = {}): Promise<T[]> {
   const run = unstable_cache(
     async () => {
+      console.log("[db-miss]", sql.replace(/\s+/g, " ").slice(0, 70));
       const res = await getDb().execute({ sql, args: args as any });
       return res.rows.map((r) => ({ ...r })) as unknown as T[];
     },
