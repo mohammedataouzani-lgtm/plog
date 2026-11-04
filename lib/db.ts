@@ -238,7 +238,7 @@ export async function getVotesActeur(acteurUid: string, opts: {
 
 export async function getStatsVotesActeur(acteurUid: string) {
   const r = await rows<{ position: string; n: number }>(
-    "SELECT position, COUNT(*) as n FROM votes WHERE acteur_uid = ? GROUP BY position",
+    "SELECT position, n FROM stats_positions WHERE acteur_uid = ?",
     [acteurUid]
   );
   const map = Object.fromEntries(r.map(x => [x.position, Number(x.n)]));
