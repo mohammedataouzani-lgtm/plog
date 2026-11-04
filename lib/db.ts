@@ -1,4 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
+import { unstable_cache } from "next/cache";
 
 let _db: Client | null = null;
 
@@ -80,8 +81,15 @@ export interface VoteCommun {
 }
 
 async function rows<T>(sql: string, args: Record<string, any> | any[] = {}): Promise<T[]> {
-  const res = await getDb().execute({ sql, args: args as any });
-  return res.rows as unknown as T[];
+  const run = unstable_cache(
+    async () => {
+      const res = await getDb().execute({ sql, args: args as any });
+      return res.rows.map((r) => ({ ...r })) as unknown as T[];
+    },
+    ["db", sql, JSON.stringify(args)],
+    { revalidate: 86400, tags: ["db"] }
+  );
+  return run();
 }
 
 async function row<T>(sql: string, args: Record<string, any> | any[] = {}): Promise<T | null> {
