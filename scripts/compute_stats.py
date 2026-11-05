@@ -101,6 +101,16 @@ def main():
 
     print(f"  Injection {len(stats)} lignes...", flush=True)
     turso_file(sql_path)
+    print("  Positions...", flush=True)
+    pos_stmts = []
+    for uid, vote_list in votes_dep.items():
+        for pos, n in Counter(p for _, p in vote_list).items():
+            u = uid.replace("'", "''")
+            q = pos.replace("'", "''")
+            pos_stmts.append(f"INSERT OR REPLACE INTO stats_positions VALUES ('{u}','{q}',{n})")
+    for i in range(0, len(pos_stmts), 100):
+        _turso_http(pos_stmts[i:i+100])
+    print(f"  {len(pos_stmts)} positions", flush=True)
     print("Stats synchronisees")
 
 if __name__ == "__main__":

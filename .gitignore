@@ -4,3 +4,4 @@ node_modules/
 .next/
 data/
 .env.local
+__pycache__/
