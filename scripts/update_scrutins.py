@@ -78,6 +78,9 @@ def main():
     if new_s==0: print("  Aucun nouveau scrutin."); return
     print(f"  {new_s} scrutins, {new_v} votes...", flush=True)
     turso_file(sql_path)
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as o:
+            o.write("changed=true\n")
     print(f"  Scrutins importes")
 
 if __name__=="__main__": main()

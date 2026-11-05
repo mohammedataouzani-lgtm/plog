@@ -40,12 +40,14 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Mise à jour scrutins (incrémental)
+        id: scrutins
         run: python scripts/update_scrutins.py
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
       - name: Calcul stats participation + rebellion
+        if: steps.scrutins.outputs.changed == 'true' || github.event.inputs.force_full == 'true'
         run: |
           echo "=== Version compute_stats ==="
           head -3 scripts/compute_stats.py
